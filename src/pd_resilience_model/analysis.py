@@ -155,3 +155,67 @@ def monte_carlo_first_entry_times(
         tau[hit] = (k + 1) * dt
         alive &= ~hit
     return tau
+
+
+def lna_fluctuations(lam: float, lag: float = 1.0, p: ModelParams = ModelParams(),
+                     sigma_S_const: float | None = None) -> dict:
+    """Linear-noise approximation of stationary fluctuations around the equilibrium.
+
+    Solves J Sigma + Sigma J^T + D = 0 with D = diag(sigma_M^2, sigma_S(S*)^2) and returns the
+    stationary variance of S and the autocorrelation of S at the given lag,
+    rho_S(lag) = [expm(J lag) Sigma]_SS / Sigma_SS. If ``sigma_S_const`` is given, sigma_S is
+    held at that value (additive-noise control).
+    """
+    from scipy.linalg import expm, solve_continuous_lyapunov
+
+    from .model import jacobian
+
+    M, S = equilibrium(lam, p)
+    J = jacobian(M, S, lam, p)
+    sS = sigma_S_const if sigma_S_const is not None else p.sigma_S0 + p.sigma_S1 * lam * S
+    D = np.diag([p.sigma_M_const**2, sS**2])
+    Sigma = solve_continuous_lyapunov(J, -D)
+    C = expm(J * lag) @ Sigma
+    return {"var_S": Sigma[1, 1], "acf_S": C[1, 1] / Sigma[1, 1]}
+
+
+def simulated_fluctuations(
+    lambda_values: Iterable[float],
+    n_paths: int = 200,
+    burn_in: float = 100.0,
+    T: float = 1000.0,
+    dt: float = 0.02,
+    lag: float = 1.0,
+    seed: int = 20240529,
+    p: ModelParams = ModelParams(),
+) -> pd.DataFrame:
+    """Stationary variance and lag autocorrelation of S from free-running stochastic paths.
+
+    Paths start at the equilibrium, are not stopped at entry into F, and are sampled every
+    ``lag`` time units after ``burn_in``. Statistics are pooled over paths and time.
+    """
+    lams = np.asarray(list(lambda_values), dtype=float)
+    rng = np.random.default_rng(seed)
+    M_star = p.M_rest - (p.b_M * p.a_S / (p.a_M * p.b_S)) * lams**2
+    S_star = p.a_S * lams / (p.b_S * M_star)
+    lam = np.repeat(lams[:, None], n_paths, axis=1)
+    M = np.repeat(M_star[:, None], n_paths, axis=1)
+    S = np.repeat(S_star[:, None], n_paths, axis=1)
+    sqrt_dt = np.sqrt(dt)
+    every = int(round(lag / dt))
+    n_burn = int(round(burn_in / dt))
+    n_total = n_burn + int(round(T / dt))
+    samples = []
+    for k in range(n_total):
+        dM = p.a_M * (p.M_rest - M) - p.b_M * lam * S * M
+        dS = p.a_S * lam - p.b_S * M * S
+        sS = p.sigma_S0 + p.sigma_S1 * lam * np.maximum(S, 0.0)
+        M = np.abs(M + dM * dt + p.sigma_M_const * sqrt_dt * rng.standard_normal(M.shape))
+        S = np.abs(S + dS * dt + sS * sqrt_dt * rng.standard_normal(S.shape))
+        if k >= n_burn and (k - n_burn) % every == 0:
+            samples.append(S.copy())
+    X = np.stack(samples, axis=-1)  # (lambda, path, time)
+    Xc = X - X.mean(axis=(1, 2), keepdims=True)
+    var = (Xc**2).mean(axis=(1, 2))
+    acf = (Xc[:, :, 1:] * Xc[:, :, :-1]).mean(axis=(1, 2)) / var
+    return pd.DataFrame({"lambda": lams, "var_S_sim": var, "acf_S_sim": acf})

@@ -26,7 +26,12 @@ from cycler import cycler
 from matplotlib.patches import Rectangle
 from scipy.integrate import solve_ivp
 
-from pd_resilience_model.analysis import deterministic_summary, monte_carlo_first_entry_times
+from pd_resilience_model.analysis import (
+    deterministic_summary,
+    lna_fluctuations,
+    monte_carlo_first_entry_times,
+    simulated_fluctuations,
+)
 from pd_resilience_model.model import ModelParams, drift, equilibrium, jacobian, simulate_stochastic
 
 # Categorical slots (fixed order) and a single-hue sequential ramp for ordered lambda values.
@@ -130,18 +135,51 @@ def make_figure2(out: Path, lambda_grid: np.ndarray) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- Figure 3
-def make_figure3(out: Path, summary: pd.DataFrame) -> None:
-    fig, ax = plt.subplots(figsize=(6.5, 4.2))
-    ax.plot(summary["lambda"], summary["relaxation_time"], marker="o", ms=5,
+def make_figure3(out: Path, summary: pd.DataFrame, seed: int) -> None:
+    lams = summary["lambda"].to_numpy()
+    fl = simulated_fluctuations(lams, seed=seed)
+    fl["var_S_lna"] = [lna_fluctuations(l)["var_S"] for l in lams]
+    fl["acf_S_lna"] = [lna_fluctuations(l)["acf_S"] for l in lams]
+    fl["var_S_lna_additive_0.10"] = [lna_fluctuations(l, sigma_S_const=0.10)["var_S"] for l in lams]
+    fl["acf_S_lna_additive_0.10"] = [lna_fluctuations(l, sigma_S_const=0.10)["acf_S"] for l in lams]
+    fl.to_csv(out / "Figure3_fluctuation_statistics.csv", index=False)
+    lam_fine = np.linspace(lams.min(), lams.max(), 200)
+    lna = pd.DataFrame([lna_fluctuations(l) for l in lam_fine])
+    lna_add = pd.DataFrame([lna_fluctuations(l, sigma_S_const=0.10) for l in lam_fine])
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.6))
+    ax = axes[0]
+    ax.plot(lams, summary["relaxation_time"], marker="o", ms=5, color=BLUE,
             label=r"$\tau_{relax}$ (finite perturbation, $e^{-1}$ criterion)")
-    ax.plot(summary["lambda"], summary["linear_relaxation_scale"], linestyle="--", linewidth=1.5,
-            color=INK2, label=r"$-1/\mu_{\max}$ (linearization)")
+    ax.plot(lams, summary["linear_relaxation_scale"], linestyle="--", linewidth=1.5, color=INK2,
+            label=r"$-1/\mu_{\max}$ (linearization)")
     ax.set_xlabel(LOAD_LABEL)
     ax.set_ylabel("Relaxation time (a.u.)")
-    ax.set_title("Relaxation time after a small perturbation")
-    ax.legend(loc="upper left")
+    ax.set_title("A) Recovery from a small perturbation")
+    ax.legend(loc="upper left", fontsize=9)
+
+    ax = axes[1]
+    ax.semilogy(lams, fl["var_S_sim"], "o", ms=5, color=BLUE, label="simulation (state-dependent noise)")
+    ax.semilogy(lam_fine, lna["var_S"], color=INK, linewidth=1.5, label="linear noise approximation")
+    ax.semilogy(lam_fine, lna_add["var_S"], color=ORANGE, linewidth=1.5, linestyle="--",
+                label=r"linear noise approx., additive $\sigma_S$ = 0.10")
+    ax.set_xlabel(LOAD_LABEL)
+    ax.set_ylabel(r"Stationary variance of $S$")
+    ax.set_title("B) Variance of stress fluctuations")
+    ax.legend(loc="upper left", fontsize=9)
+
+    ax = axes[2]
+    ax.plot(lams, fl["acf_S_sim"], "o", ms=5, color=BLUE, label="simulation (state-dependent noise)")
+    ax.plot(lam_fine, lna["acf_S"], color=INK, linewidth=1.5,
+            label="linear noise approximation\n(identical for additive noise)")
+    ax.set_xlabel(LOAD_LABEL)
+    ax.set_ylabel(r"Lag-1 autocorrelation of $S$")
+    ax.set_title("C) Autocorrelation of stress fluctuations")
+    ax.set_ylim(0.6, 1.0)
+    ax.legend(loc="upper left", fontsize=9)
+
     fig.tight_layout()
-    save(fig, out, "Figure3_relaxation_time")
+    save(fig, out, "Figure3_slowing_down")
 
 
 # ---------------------------------------------------------------- Figure 4
@@ -370,7 +408,7 @@ def main() -> None:
     print("Figure 2 and deterministic summary...")
     summary = make_figure2(out, lambda_grid)
     print("Figure 3...")
-    make_figure3(out, summary)
+    make_figure3(out, summary, args.seed)
     print("Figure 4...")
     make_figure4(out, args.S_c, args.M_c)
     print("Figure 5 and Monte Carlo summary...")
