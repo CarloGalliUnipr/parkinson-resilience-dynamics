@@ -52,12 +52,12 @@ python scripts/make_figures.py --out outputs --n-reps 1000
 This produces:
 
 - `Figure2_deterministic.png/pdf`
-- `Figure3_relaxation_time.png/pdf`
+- `Figure3_slowing_down.png/pdf` (relaxation time, variance and lag-1 autocorrelation of S)
 - `Figure4_stochastic_trajectories.png/pdf`
 - `Figure5_monte_carlo_first_entry.png/pdf`
 - `Figure6AB_state_space.png/pdf` (panels A–B of Figure 6; panel C is a schematic)
 - `FigureS1_sensitivity.png/pdf`
-- `deterministic_summary.csv`, `monte_carlo_first_entry_summary.csv`, `FigureS1_sensitivity_summary.csv`
+- `deterministic_summary.csv`, `Figure3_fluctuation_statistics.csv`, `monte_carlo_first_entry_summary.csv`, `FigureS1_sensitivity_summary.csv`
 
 All Monte Carlo results use the seeded, vectorized Euler–Maruyama integrator in `analysis.monte_carlo_first_entry_times` (Itô interpretation), so they are reproducible for a given `--seed`. The optional `numba_mc.py` module is retained for speed experiments but is not used for the manuscript figures. A full run takes a few minutes on a laptop.
 
