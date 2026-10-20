@@ -9,6 +9,11 @@ Quick test run:
 Paper-style run:
     python scripts/make_figures.py --out outputs --n-reps 1000
 
+Random numbers: NumPy ``default_rng`` (PCG64). Figure 4 uses seeds 1 (lambda = 1.00) and
+2 (lambda = 1.40); Figures 3B-C, 5 and S1 use the base seed (default 20240529), one stream per
+call shared by all loads; Figure 6B uses the base seed + 0, 1, 2 for lambda = 1.00, 1.37, 1.43.
+Each S1 configuration reuses the base seed (common random numbers across configurations).
+
 All Monte Carlo simulations use the seeded, vectorized Euler-Maruyama integrator in
 ``pd_resilience_model.analysis.monte_carlo_first_entry_times`` (Ito interpretation), so
 results are reproducible bit-for-bit for a given seed.
@@ -85,6 +90,7 @@ def first_entry_summary(lams: np.ndarray, tau: np.ndarray, T: float, **meta) -> 
                 **meta,
                 "n_entered": int(entered.sum()),
                 "p_entry": p,
+                # Normal-approximation (Wald) binomial 95% interval, as shown in Figure 5B.
                 "p_entry_ci95_halfwidth": 1.96 * np.sqrt(p * (1 - p) / n),
                 "median_entry_time": np.nanmedian(t) if entered.any() else np.nan,
                 "mean_entry_time_given_entry": np.nanmean(t) if entered.any() else np.nan,
@@ -287,8 +293,14 @@ def make_figure_s1(out: Path, n_reps: int, dt: float, seed: int) -> None:
             if key == "B":
                 # load at which the deterministic equilibrium itself enters F
                 p = cfg["p"]
+                # Both conditions defining F must hold: M* < M_c and S* > S_c.
                 k = p.b_M * p.a_S / (p.a_M * p.b_S)
-                lam_in = np.sqrt((p.M_rest - cfg["M_c"]) / k)
+                lam_M = np.sqrt((p.M_rest - cfg["M_c"]) / k)
+                S_c_cfg = cfg["S_c"]
+                # S*(lam) = S_c  <=>  k S_c lam^2 + (a_S/b_S) lam - M_rest S_c = 0
+                a2, a1, a0 = k * S_c_cfg, p.a_S / p.b_S, -p.M_rest * S_c_cfg
+                lam_S = (-a1 + np.sqrt(a1**2 - 4 * a2 * a0)) / (2 * a2)
+                lam_in = max(lam_M, lam_S)
                 ax.axvline(lam_in, color=color, linewidth=1, linestyle=ls, alpha=0.8)
         ax.set_title(titles[key])
         ax.set_xlabel(LOAD_LABEL)

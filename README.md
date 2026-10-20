@@ -2,7 +2,7 @@
 
 This repository contains the Python code used to generate the simulations and figures for the manuscript:
 
-**Resilience Loss and Noise-Driven Escape in a Minimal Stochastic Model of Dopaminergic Neuron Vulnerability** (title under revision)
+**Resilience Loss and Noise-Driven Threshold Crossing in a Minimal Stochastic Model of Dopamine Neuron Vulnerability**
 
 The model is a two-variable stochastic dynamical system describing the interaction between mitochondrial reserve (`M`) and composite cellular stress (`S`) under an effective sustained load parameter (`lambda`). The code reproduces the deterministic equilibrium analysis, local stability analysis, relaxation-time calculations, stochastic trajectories, Monte Carlo first-entry analysis, the state-space panels of Figure 6, and the supplementary sensitivity analysis reported in the manuscript.
 
@@ -59,7 +59,7 @@ This produces:
 - `FigureS1_sensitivity.png/pdf`
 - `deterministic_summary.csv`, `Figure3_fluctuation_statistics.csv`, `monte_carlo_first_entry_summary.csv`, `FigureS1_sensitivity_summary.csv`
 
-All Monte Carlo results use the seeded, vectorized Euler–Maruyama integrator in `analysis.monte_carlo_first_entry_times` (Itô interpretation), so they are reproducible for a given `--seed`. The optional `numba_mc.py` module is retained for speed experiments but is not used for the manuscript figures. A full run takes a few minutes on a laptop.
+All Monte Carlo results use the seeded, vectorized Euler–Maruyama integrator in `analysis.monte_carlo_first_entry_times` (Itô interpretation), so they are reproducible for a given `--seed` (NumPy `default_rng`, PCG64; base seed 20240529, Figure 4 seeds 1 and 2). Entry probabilities carry normal-approximation (Wald) binomial 95% intervals. A trajectory whose starting equilibrium already lies in F is assigned τ = 0. The optional `numba_mc.py` module (install with `pip install -e .[numba]`) is retained for speed experiments but is not used for the manuscript figures. A full run takes a few minutes on a laptop.
 
 For a quick test run:
 
