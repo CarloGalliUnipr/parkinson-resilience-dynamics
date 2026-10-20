@@ -55,7 +55,7 @@ This produces:
 - `Figure3_slowing_down.png/pdf` (relaxation time, variance and lag-1 autocorrelation of S)
 - `Figure4_stochastic_trajectories.png/pdf`
 - `Figure5_monte_carlo_first_entry.png/pdf`
-- `Figure6AB_state_space.png/pdf` (panels A–B of Figure 6; panel C is a schematic)
+- `Figure6_full.png/pdf` (complete Figure 6: panels A–B from the model, panel C schematic) and `Figure6AB_state_space.png/pdf` (panels A–B only)
 - `FigureS1_sensitivity.png/pdf`
 - `deterministic_summary.csv`, `Figure3_fluctuation_statistics.csv`, `monte_carlo_first_entry_summary.csv`, `FigureS1_sensitivity_summary.csv`
 

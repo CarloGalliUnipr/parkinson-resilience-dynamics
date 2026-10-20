@@ -310,8 +310,18 @@ def make_figure6ab(out: Path, S_c: float, M_c: float, n_cells: int, seed: int) -
     eq_path = np.array([equilibrium(l) for l in lam_path])
     marks = [1.00, 1.37, 1.43]
 
-    fig = plt.figure(figsize=(15, 5.2))
-    gs = fig.add_gridspec(1, 4, width_ratios=[1.35, 1, 1, 1], wspace=0.28)
+    for with_c in (False, True):
+        _figure6(out, p, lam_c, eq_path, marks, S_c, M_c, n_cells, seed, with_c)
+
+
+def _figure6(out, p, lam_c, eq_path, marks, S_c, M_c, n_cells, seed, with_c):
+    if with_c:
+        fig = plt.figure(figsize=(15, 10.6))
+        outer = fig.add_gridspec(2, 1, height_ratios=[5.2, 5.0], hspace=0.28)
+        gs = outer[0].subgridspec(1, 4, width_ratios=[1.35, 1, 1, 1], wspace=0.28)
+    else:
+        fig = plt.figure(figsize=(15, 5.2))
+        gs = fig.add_gridspec(1, 4, width_ratios=[1.35, 1, 1, 1], wspace=0.28)
     axA = fig.add_subplot(gs[0, 0])
     axB = [fig.add_subplot(gs[0, i]) for i in (1, 2, 3)]
 
@@ -385,7 +395,70 @@ def make_figure6ab(out: Path, S_c: float, M_c: float, n_cells: int, seed: int) -
     axB[0].scatter([], [], s=12, color=INK2, alpha=0.6, label=f"{n_cells} cells at t = 200")
     axB[0].plot([], [], color=BLUE, linewidth=1, label="one sample path")
     axB[0].legend(loc="center right", fontsize=8.5)
-    save(fig, out, "Figure6AB_state_space")
+    if with_c:
+        draw_panel_c(fig.add_subplot(outer[1]))
+        save(fig, out, "Figure6_full")
+    else:
+        save(fig, out, "Figure6AB_state_space")
+
+
+def draw_panel_c(ax) -> None:
+    """Schematic mapping of PD-associated processes onto the model (Figure 6C)."""
+    from matplotlib.patches import FancyBboxPatch, Polygon, Circle
+
+    ax.set_xlim(0, 21.6)
+    ax.set_ylim(0, 7.2)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title("C) PD-associated processes mapped onto model parameters", loc="left")
+    LOAD_FILL, LOAD_EDGE = "#dce8f8", "#2a78d6"
+    REST_FILL, REST_EDGE = "#d9f0e6", "#148a5f"
+    BOX_FILL, BOX_EDGE = "#f1f0ec", "#8f8e89"
+
+    def box(x, y, w, h, text, fc=BOX_FILL, ec=BOX_EDGE, fs=10.5, weight="normal"):
+        ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0.02,rounding_size=0.18",
+                                    fc=fc, ec=ec, lw=1.2))
+        ax.text(x, y, text, ha="center", va="center", fontsize=fs, color=INK, weight=weight)
+
+    def arrow(x0, y0, x1, y1, color=INK2):
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=1.2, shrinkA=0, shrinkB=0,
+                                    mutation_scale=12))
+
+    processes = [
+        ("α-synuclein misfolding", "L"),
+        ("Ca²⁺-dependent\npacemaking", "L"),
+        ("Dopamine oxidation", "LR"),
+        ("Neuromelanin-associated\nchanges", "LR"),
+        ("Iron dysregulation", "LR"),
+        ("Glutathione limitation", "R"),
+        ("Glial/inflammatory\nstress", "R"),
+    ]
+    bx, bw, bh = 2.4, 4.4, 0.8
+    ys = np.linspace(6.6, 0.55, len(processes))
+    yL, yR = 4.85, 2.15
+    tri_x0, tri_x1, tri_h = 7.9, 11.7, 2.0
+    for (label, tgt), y in zip(processes, ys):
+        box(bx, y, bw, bh, label, fs=10)
+        for t in tgt:
+            ty = yL if t == "L" else yR
+            arrow(bx + bw / 2, y, tri_x0, ty + float(np.clip((y - ty) * 0.12, -0.55, 0.55)),
+                  color=LOAD_EDGE if t == "L" else REST_EDGE)
+    for yc, fc, ec, txt in [(yL, LOAD_FILL, LOAD_EDGE, "↑ Effective\nsustained load"),
+                            (yR, REST_FILL, REST_EDGE, "↓ Restorative\ncapacity")]:
+        ax.add_patch(Polygon([[tri_x0, yc + tri_h / 2], [tri_x0, yc - tri_h / 2], [tri_x1, yc]],
+                             closed=True, fc=fc, ec=ec, lw=1.4))
+        ax.text(tri_x0 + 0.15, yc, txt, ha="left", va="center", fontsize=10, weight="bold", color=INK)
+    cx, r = 13.9, 1.2
+    for yc, fc, ec, txt in [(yL, LOAD_FILL, LOAD_EDGE, "λ: effective\nsustained\nload"),
+                            (yR, REST_FILL, REST_EDGE, "Recovery rate\n(|μ$_{\\max}$|)")]:
+        ax.add_patch(Circle((cx, yc), r, fc=fc, ec=ec, lw=1.4))
+        ax.text(cx, yc, txt, ha="center", va="center", fontsize=10.5, color=INK)
+        arrow(tri_x1, yc, cx - r, yc, color=ec)
+    for yc, fc, ec, txt in [(yL, LOAD_FILL, LOAD_EDGE, "Prolonged\ncompensation"),
+                            (yR, REST_FILL, REST_EDGE, "Probability of\nentering $\\mathcal{F}$")]:
+        box(18.4, yc, 3.6, 1.1, txt, fc=fc, ec=ec, fs=10.5)
+        arrow(cx + r, yc, 18.4 - 1.8, yc, color=ec)
 
 
 def main() -> None:
