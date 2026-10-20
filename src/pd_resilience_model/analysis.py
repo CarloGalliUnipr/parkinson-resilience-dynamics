@@ -54,7 +54,7 @@ def deterministic_summary(lambda_values: Iterable[float], p: ModelParams = Model
     return pd.DataFrame(rows)
 
 
-def monte_carlo_escape_statistics(
+def monte_carlo_escape_statistics(  # legacy: not used for the manuscript figures
     lambda_values: Iterable[float],
     n_reps: int = 1000,
     T: float = 500.0,
@@ -140,6 +140,10 @@ def monte_carlo_first_entry_times(
     S = np.repeat(S_star[:, None], n_reps, axis=1)
     tau = np.full(M.shape, np.nan)
     alive = np.isfinite(M) & np.isfinite(S) & (M > 0)
+    # An initial state already inside F has tau = 0 (immediate commitment, not noise-driven entry).
+    start_in_F = alive & (S > S_c) & (M < M_c)
+    tau[start_in_F] = 0.0
+    alive &= ~start_in_F
     sqrt_dt = np.sqrt(dt)
     for k in range(int(round(T / dt))):
         if not alive.any():
