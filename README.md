@@ -2,7 +2,7 @@
 
 This repository contains the Python code for the phenomenological, two-variable stochastic model described in the manuscript **Resilience Loss and Noise-Driven Threshold Crossing in a Minimal Stochastic Model of Dopamine Neuron Vulnerability** (Gavrilova, Liashenko, Collingwood, Boltze and Galli). The model is **not calibrated** to measured molecular rates, neuronal lifetimes or clinical progression.
 
-**Release used for the manuscript:** GitHub tag `v2.0`, archived on Zenodo at https://doi.org/10.5281/zenodo.23676080. The Python package metadata in `pyproject.toml` still reports version `1.1.0`; the code is the same.
+**Release used for the manuscript:** GitHub tag `v2.0`, archived on Zenodo at https://doi.org/10.5281/zenodo.23676080.
 
 Section numbers such as "A.9" below refer to Appendix A (Supplementary Information) of the manuscript.
 
