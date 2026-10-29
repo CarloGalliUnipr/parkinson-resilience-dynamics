@@ -1,19 +1,25 @@
 # Parkinson resilience dynamics — reproducible reserve–stress model
 
-This repository contains Python code for the phenomenological, two-variable stochastic model described in the manuscript **Resilience Loss and Noise-Driven Threshold Crossing in a Minimal Stochastic Model of Dopamine Neuron Vulnerability**. The model is **not calibrated** to measured molecular rates, neuronal lifetimes, or clinical progression.
+This repository contains the Python code for the phenomenological, two-variable stochastic model described in the manuscript **Resilience Loss and Noise-Driven Threshold Crossing in a Minimal Stochastic Model of Dopamine Neuron Vulnerability** (Gavrilova, Liashenko, Collingwood, Boltze and Galli). The model is **not calibrated** to measured molecular rates, neuronal lifetimes or clinical progression.
 
-**Version v1.1.0** adds the balanced rate-rescaling controls (Supplementary Figure S2), Monte Carlo timestep verification, the Supplementary Table S1 summary and numerical tests. The equations and primary Figure 2–6 generators are unchanged from release v1.0.
+**Release used for the manuscript:** GitHub tag `v2.0`, archived on Zenodo at https://doi.org/10.5281/zenodo.23676080. The Python package metadata in `pyproject.toml` still reports version `1.1.0`; the code is the same.
+
+Section numbers such as "A.9" below refer to Appendix A (Supplementary Information) of the manuscript.
 
 ## Model
 
-The state is mitochondrial functional reserve `M >= 0` and composite stress `S >= 0` at fixed sustained load `λ`. The deterministic drift is
+The state is mitochondrial functional reserve `M >= 0` and composite stress `S >= 0` at a fixed sustained load `λ`. The deterministic drift is
 
 ```text
 dM/dt = a_M (M_rest - M) - b_M λ S M
 dS/dt = a_S λ - b_S M S
 ```
 
-Parameters: `a_M=0.5`, `b_M=0.4`, `M_rest=1.0`, `a_S=0.3`, `b_S=0.6`. For `λ < sqrt(a_M*b_S*M_rest/(b_M*a_S)) ≈ 1.5811`, the positive survival equilibrium is unique and stable. The stochastic dynamics use independent Itô Wiener drivers, `σ_M=0.003`, `σ_S=0.015+0.03 λ max(S,0)` and numerical reflection `abs` at each boundary. The operational first-entry criterion is **simultaneously** `M < 0.15` and `S > 3.5`. The underlying drift has no absorbing death state; irreversible commitment is an imposed survival-analysis convention.
+Baseline parameters (manuscript Table S1): `a_M=0.5`, `b_M=0.4`, `M_rest=1.0`, `a_S=0.3`, `b_S=0.6`.
+
+- For `λ < λc = sqrt(a_M*b_S*M_rest/(b_M*a_S)) = sqrt(2.5) ≈ 1.5811` there is a single positive equilibrium, `M* = 1 - 0.4 λ²`, `S* = 0.5 λ / M*`. It is stable and attracts every trajectory (Appendix A.2–A.3). For `λ ≥ λc` there is no equilibrium and `S` is unbounded.
+- Stochastic dynamics (Itô, Appendix A.6): independent Wiener drivers, `σ_M = 0.003`, `σ_S = 0.015 + 0.03 λ max(S, 0)`. Integration is Euler–Maruyama with `dt = 0.02`, and negative values are reflected (`abs`) after each step.
+- Loss of viability (Appendix A.7) is first entry into `F = {S > 3.5 and M < 0.15}`, with **both** inequalities strict. A trajectory that starts inside `F` has `τ = 0`. The drift has no absorbing death state: treating first entry as irreversible commitment is a survival-analysis convention, not a property of the equations.
 
 ## Install
 
@@ -24,49 +30,74 @@ python -m venv .venv
 python -m pip install -e .
 ```
 
-Requirements: Python >= 3.10, NumPy, SciPy, pandas and Matplotlib. `numba` is optional and is **not** used for the manuscript's primary simulations. Use a fixed environment and the release tag to reproduce exact pseudo-random results across machines.
+Requirements: Python >= 3.10, NumPy, SciPy, pandas and Matplotlib. `numba` is optional and is **not** used for any manuscript result. To reproduce pseudo-random results exactly, use the `v2.0` tag and a fixed environment.
 
-## Reproduce the figures and controls
+## What reproduces what
 
-From the repository root after installing:
+| Manuscript item | Command | Main outputs |
+| --- | --- | --- |
+| Figures 2, 3, 4, 5, 6 and Supplementary Figure S1 | `python scripts/make_figures.py --out outputs --n-reps 1000` | figure PNG/PDF pairs and CSV summaries; manuscript Figure 6 is `Figure6AB_state_space` |
+| Supplementary Figure S2 (matched-recovery controls) | `python scripts/make_figure_s2.py --out outputs --n-reps 1000` | `FigureS2_matched_recovery.png/pdf/csv` |
+| Supplementary Table S3 (first-entry statistics) | `python scripts/make_table_s1.py --out outputs --n-reps 1000` | `Supplementary_Table_S1.csv` (legacy file name; this is manuscript **Table S3**) |
+| Timestep check reported in main-text Section 2.8 | `python scripts/check_timestep_convergence.py --out outputs --n-reps 1000` | `timestep_convergence_selected.csv` |
+| Full-grid timestep check reported in Appendix A.9 | `python scripts/check_timestep_convergence.py --out outputs --n-reps 1000 --full-grid --dt 0.02 0.01` | `timestep_convergence_full_grid.csv` |
+| Numerical and mathematical tests | `python -m unittest discover -s tests -v` | — |
 
-```bash
-# Original Figures 2, 3, 4, 5, 6 and Supplementary Figure S1
-python scripts/make_figures.py --out outputs --n-reps 1000
+Reference copies of the S2, Table S3 and three-load timestep outputs are in `reference_outputs/`.
 
-# New balanced numerical controls: Supplementary Figure S2
-python scripts/make_figure_s2.py --out outputs --n-reps 1000
+Not generated by code: manuscript Figures 1 and 7 are conceptual schematics. The `Figure6_full` file written by `make_figures.py` is a legacy composite with an extra panel C. It is **not** the manuscript Figure 6.
 
-# Manuscript timestep checks (the three selected loads in one seeded run)
-python scripts/check_timestep_convergence.py --out outputs --n-reps 1000
+For quick smoke tests, use `--n-reps 20`. `make_figures.py` also accepts `--skip-supplementary`, and the other scripts accept a short `--T` (for example `--T 20`).
 
-# Supplementary Table S1 (same full grid as Figure 5)
-python scripts/make_table_s1.py --out outputs --n-reps 1000
+## Notes on the Monte Carlo analyses
 
-# Basic reproducibility and mathematical assertions
-python -m unittest discover -s tests -v
-```
+### Random numbers
 
-For short smoke tests replace `--n-reps 1000` by `--n-reps 20` and add `--T 20` to the two new control scripts as appropriate; the original `make_figures.py` has its own `--skip-supplementary` quick mode. The full three-timestep convergence run adds substantial computation relative to a smoke test.
+All simulations use NumPy `default_rng` (PCG64) with base seed `20240529`, except Figure 4, which uses seeds 1 (λ = 1.00) and 2 (λ = 1.40). Figures 3B–C and 5, and each Figure S1 configuration, use one random stream shared by all loads in a run, so the Figure S1 configurations use common random numbers. Figure 6B uses the base seed + 0, 1, 2 for λ = 1.00, 1.37, 1.43. Figure S2 uses one stream shared across its four conditions and both noise prescriptions.
 
-**Outputs** include the existing figure PNG/PDF pairs and tabular CSVs, plus `FigureS2_matched_recovery.png/pdf`, `FigureS2_matched_recovery.csv`, `timestep_convergence_selected.csv` (optional `timestep_convergence_full_grid.csv` with `--full-grid`), and `Supplementary_Table_S1.csv`.
+Results therefore depend on how the stream is allocated, not only on the seed. Simulating a different set of loads, or changing `dt`, changes individual sample paths. Comparisons between such runs are statistical, not path-by-path.
+
+### Timestep checks (two of them)
+
+1. **Three selected loads** (main text, Section 2.8). λ = 1.37, 1.40 and 1.43 are simulated together at `dt` = 0.02, 0.01 and 0.005 (`n = 1000`, `T = 500`). Expected counts out of 1000:
+
+   | dt | λ = 1.37 | λ = 1.40 | λ = 1.43 |
+   | --- | --- | --- | --- |
+   | 0.02 | 49 | 526 | 968 |
+   | 0.01 | 55 | 523 | 973 |
+   | 0.005 | 56 | 539 | 963 |
+
+   The script asserts these nine counts when run with default arguments.
+
+2. **Full Figure 5 grid** (Appendix A.9). λ = 1.25–1.45 in steps of 0.01 at `dt` = 0.02 and 0.01. The `dt = 0.02` run is the Figure 5 / Table S3 run itself; for example, it gives 535/1000 at λ = 1.40. The `dt = 0.01` run gives 495/1000 at λ = 1.40. Across the grid, the largest standardized difference between the two timesteps is |z| = 1.79.
+
+The two checks give slightly different `dt = 0.02` counts at the same load (526 vs 535 at λ = 1.40). This is because the random stream is divided among three loads in one case and 21 in the other.
 
 ### Figure S2 protocol
 
-Two equilibrium configurations (`λ=1.37` and `1.40`) are each studied at matched linear relaxation scales of approximately **28.36** and **37.31** time units. At `λ=1.37`, the slow-recovery case rescales all four deterministic rate coefficients by `r=0.7601`; at `λ=1.40`, the fast-recovery case uses `r=1.3156`. The two other cases retain `r=1.0`. Common normal increments are applied across all four configurations under (A) the original state-dependent stress noise and (B) additive `σ_S=0.15`. Reserve noise stays at `0.003`, `T=500`, `dt=0.02`, `n=1000`, with strict threshold inequalities. Error bars are Wilson binomial 95% confidence intervals. The script uses base seed `20240529`.
+Two equilibrium configurations, λ = 1.37 and 1.40, are compared at matched linear relaxation times of about **28.36** and **37.31** time units. To do this, all four rate coefficients (`a_M`, `b_M`, `a_S`, `b_S`) are multiplied by a common factor `r`:
 
-The rate rescaling **does not move the equilibrium** at a fixed load but changes the linear timescale. Since stochastic noise amplitudes are held fixed, this is a mathematical control rather than a pure biological intervention. Changing λ also changes nonlinear drift structure: the comparison is not a unique causal decomposition.
+- at λ = 1.37 the slow-recovery case uses `r = 0.7601`;
+- at λ = 1.40 the fast-recovery case uses `r = 1.3156`;
+- the other two cases keep `r = 1`.
 
-### Timestep comparison
+This leaves the equilibrium unchanged and divides `τ_lin` by `r`. Because the noise amplitudes are held fixed, it is also equivalent to rescaling time with noise divided by `sqrt(r)`. The control is therefore mathematical, not a pure biological intervention.
 
-`check_timestep_convergence.py` repeats **only the three selected loads** λ = 1.37, 1.40 and 1.43 together for `dt = 0.02, 0.01, 0.005`, with the same seed, `T=500`, `n=1000`. This exactly reproduces the nine published counts: 49/526/968, 55/523/973 and 56/539/963 out of 1000. Add `--full-grid` for an optional 21-load check, but it uses a different assignment of the same seeded random stream and therefore gives different realized counts. The main Figure 5 and Table S1 reproduce the full-grid run; the independent timestep controls reproduce the three-load run. Changing `dt` changes random-number consumption: a fixed seed does *not* couple Wiener sample paths across resolutions. Statistical comparison, not equality of sample paths, is appropriate.
+The simulations use the same Gaussian increments across all conditions, under (A) the baseline state-dependent stress noise and (B) additive `σ_S = 0.15`, with `σ_M = 0.003`, `T = 500`, `dt = 0.02` and `n = 1000`. Error bars are Wilson 95% intervals.
 
-### Scope of figure reproducibility
+The two `r = 1` conditions repeat the baseline settings but use this separate stream. Their entry probabilities (0.067 at λ = 1.37 and 0.493 at λ = 1.40) therefore differ from Table S3 (0.049 and 0.535) within Monte Carlo error.
 
-Figures 2–5, manuscript Figure 6 (the `Figure6AB_state_space` file), and S1 are generated by `scripts/make_figures.py`; S2 is generated separately. The generated `Figure6_full` is a legacy extra composite containing a panel C and must not be mistaken for the revised manuscript Figure 6. The manuscript's conceptual Figures 1 and 7 contain illustrations/schematics, and are not generated by these numerical scripts. Figure 6C in the original repository is a **separate** illustration from manuscript Figure 7. The existing source files for Figures 2–6 and S1 are retained unchanged in v1.1.0.
+### Table S3 statistics
 
-## Release information and citation
+- **Entry probabilities** use Wald 95% intervals (as in Figure 5).
+- **Hazard** = entries / total observed time (entry time for trajectories that entered `F`, `T` for censored ones). This is the maximum-likelihood estimate under a constant hazard.
+- **Reciprocal of the hazard** is reported as a mean time to loss only under that constant-hazard approximation. It extrapolates far beyond the window at λ ≤ 1.36. At λ ≥ 1.44 the entry times are not exponential: the CV given entry is greater than 1.
+- **Medians and CVs** are conditional on entry by `T`.
 
-Use the immutable GitHub tag `v1.1.0` for the computations accompanying the current manuscript. A new version-specific Zenodo DOI must be checked **after** the new release is archived. Do not automatically reuse the earlier version-specific DOI as if it contained the v1.1.0 scripts. The article should cite the archived version that actually contains all reported numerical analyses.
+## Scope
 
-The present model is an abstract first-entry model. Its commitment criterion does not demonstrate ferroptosis, cuproptosis, apoptosis or any other molecular death pathway.
+This is an abstract first-entry model. Its commitment criterion does not demonstrate ferroptosis, cuproptosis, apoptosis or any other molecular death pathway.
+
+## Citation
+
+Please cite the manuscript and the archived release: Zenodo, https://doi.org/10.5281/zenodo.23676080 (GitHub tag `v2.0`).
